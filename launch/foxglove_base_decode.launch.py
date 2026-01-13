@@ -61,7 +61,7 @@ def generate_launch_description():
             ('in/foxglove', in_foxglove),
             ('out', out_raw),
         ],
-        arguments=['ffmpeg', 'raw']
+        arguments=['foxglove', 'raw']
     )
 
     """
