@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(********** Fill in project name **********)
+project(umrt-localization-ros)
 
 set(CMAKE_CXX_STANDARD 14)
 
@@ -14,6 +14,7 @@ include_directories(SYSTEM /opt/ros/$ENV{ROS_DISTRO}/include)
 set(THIS_PACKAGE_INCLUDE_DEPENDS
         rclcpp
         rclcpp_lifecycle
+        ublox_dgnss
         )
 
 # find dependencies
