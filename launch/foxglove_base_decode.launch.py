@@ -22,26 +22,27 @@ def generate_launch_description():
     # Declare arguments
     namespace_arg = DeclareLaunchArgument(
         'namespace',
-        default_value='',
+        default_value='rover/poe',
         description = 'Namespace for camera.'
     )
     in_foxglove_arg = DeclareLaunchArgument(
         'in_foxglove',
-        default_value='/poe_cam/encoded_video',
+        default_value='encoded_video',
         description = 'Input Foxglove Compressed Video topic.'
     )
     out_raw_arg = DeclareLaunchArgument(
         'out_raw',
-        default_value='/poe_cam/Image',
+        default_value='raw',
         description = 'Output raw image topic.'
     )
 
-    qos_profile = QoSProfile(
-        reliability=ReliabilityPolicy.BEST_EFFORT, # Matches your C++ publisher
-        history=HistoryPolicy.KEEP_LAST,
-        depth=1, # Depth 1 as per your C++ publisher
-        durability=DurabilityPolicy.VOLATILE # Matches your C++ publisher
-    )
+    # didnt really apply this
+    # qos_profile = QoSProfile(
+    #     reliability=ReliabilityPolicy.BEST_EFFORT, # Matches your C++ publisher
+    #     history=HistoryPolicy.KEEP_LAST,
+    #     depth=1, # Depth 1 as per your C++ publisher
+    #     durability=DurabilityPolicy.VOLATILE # Matches your C++ publisher
+    # )
 
     # Launch configurations
     namespace = LaunchConfiguration('namespace')
@@ -61,7 +62,13 @@ def generate_launch_description():
             ('in/foxglove', in_foxglove),
             ('out', out_raw),
         ],
-        arguments=['foxglove', 'raw']
+        arguments=['foxglove', 'raw'],
+        parameters=[{
+        'qos_overrides./in/foxglove.subscription.reliability': 'best_effort',
+        'qos_overrides./in/foxglove.subscription.durability': 'volatile',
+        'qos_overrides./in/foxglove.subscription.history': 'keep_last',
+        'qos_overrides./in/foxglove.subscription.depth': 1,
+        }]
     )
 
     """
