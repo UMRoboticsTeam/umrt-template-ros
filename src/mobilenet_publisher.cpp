@@ -64,7 +64,7 @@ private:
 
     // Queues
     std::shared_ptr<dai::MessageQueue> encoded_q_;
-    std::shared_ptr<dai::MessageQueue> raw_q_;
+    // std::shared_ptr<dai::MessageQueue> raw_q_;
     std::shared_ptr<dai::MessageQueue> imu_q_;
     std::shared_ptr<dai::MessageQueue> depth_q_;
     std::shared_ptr<dai::MessageQueue> odom_q_;
@@ -73,7 +73,7 @@ private:
     // std::unique_ptr<depthai_bridge::BridgePublisher<sensor_msgs::msg::Imu, dai::IMUData>> imu_pub_;
     // std::unique_ptr<depthai_bridge::BridgePublisher<sensor_msgs::msg::Image, dai::ImgFrame>> depth_pub_;
     rclcpp::Publisher<foxglove_msgs::msg::CompressedVideo>::SharedPtr encoded_pub_;
-    rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr raw_pub_;
+    // rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr raw_pub_;
     rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_; 
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr depth_pub_;
     rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr depth_info_pub_;
@@ -85,13 +85,18 @@ private:
     std::shared_ptr<depthai_bridge::ImageConverter> depth_conv_;
     std::shared_ptr<depthai_bridge::TransformDataConverter> odom_conv_;
 
+    int imu_warmup_count_ = 0;
+    int depth_warmup_count_ = 0;
+    const int MAX_WARMUP_COUNT = 50;
+
+
 };
 
 void MobileNetPublisherNode::setupCameraPipeline(dai::Pipeline& pipeline) {
     color_cam_ = pipeline.create<dai::node::Camera>()->build(dai::CameraBoardSocket::CAM_A);
     video_enc_ = pipeline.create<dai::node::VideoEncoder>();
 
-    auto script_node = pipeline.create<dai::node::Script>();
+    // auto script_node = pipeline.create<dai::node::Script>();
 
     video_enc_->setDefaultProfilePreset(30, dai::VideoEncoderProperties::Profile::H264_MAIN);
 
@@ -101,33 +106,31 @@ void MobileNetPublisherNode::setupCameraPipeline(dai::Pipeline& pipeline) {
 
     //  For Raw Stream
     // auto raw_out = color_cam_->requestOutput({640, 360}, dai::ImgFrame::Type::BGR888i, dai::ImgResizeMode::CROP, 30);
-    cam_out->link(script_node->inputs["in"]);
+    // cam_out->link(script_node->inputs["in"]);
 
-    script_node->setScript(R"(
-        import time
-        frame_count = 0
-        while True:
-            frame = node.io['in'].get()
+    // script_node->setScript(R"(
+    //     import time
+    //     frame_count = 0
+    //     while True:
+    //         frame = node.io['in'].get()
 
-            # Forwave for ever 3rd frame = 10 FPS
-            if frame_count % 3 == 0:
-                node.io['out'].send(frame)
+    //         # Forwave for ever 3rd frame = 10 FPS
+    //         if frame_count % 3 == 0:
+    //             node.io['out'].send(frame)
 
-            frame_count += 1
-    )");
+    //         frame_count += 1
+    // )");
 
     encoded_q_ = video_enc_->out.createOutputQueue(30, false);
-    raw_q_ = script_node->outputs["out"].createOutputQueue(2, false);
+    // raw_q_ = script_node->outputs["out"].createOutputQueue(2, false);
     // raw_q_ = raw_out->createOutputQueue(2, false);
 }
 
 void MobileNetPublisherNode::setupImuPipeline(dai::Pipeline& pipeline) {
     imu_node_ = pipeline.create<dai::node::IMU>();
     imu_node_->enableIMUSensor({dai::IMUSensor::ACCELEROMETER_RAW, dai::IMUSensor::GYROSCOPE_RAW}, 200);
-    // imu_node_->setBatchReportThreshold(1);
-    // imu_node_->setMaxBatchReports(10);
-    imu_node_->setBatchReportThreshold(5);
-    imu_node_->setMaxBatchReports(20);
+    imu_node_->setBatchReportThreshold(1);
+    imu_node_->setMaxBatchReports(10);
     
     imu_q_ = imu_node_->out.createOutputQueue(8, false);
 }
@@ -135,6 +138,9 @@ void MobileNetPublisherNode::setupImuPipeline(dai::Pipeline& pipeline) {
 void MobileNetPublisherNode::setupDepthPipeline(dai::Pipeline& pipeline) {
 
     stereo_depth_ = pipeline.create<dai::node::StereoDepth>();
+
+    stereo_depth_->setDefaultProfilePreset(dai::node::StereoDepth::PresetMode::ROBOTICS);
+
     // mono_left = pipeline.create<dai::node::Camera>()->build(dai::CameraBoardSocket::CAM_B);
     // mono_right = pipeline.create<dai::node::Camera>()->build(dai::CameraBoardSocket::CAM_C);
     // Throttle the VIO/Depth cameras to 15 FPS to guarantee bandwidth for the 200Hz IMU
@@ -185,22 +191,22 @@ void MobileNetPublisherNode::setupVideoPublishers() {
         }
     });
 
-    raw_pub_ = this->create_publisher<sensor_msgs::msg::Image>("raw_video", best_effort_qos);
+    // raw_pub_ = this->create_publisher<sensor_msgs::msg::Image>("raw_video", best_effort_qos);
 
-    raw_q_->addCallback([this](std::shared_ptr<dai::ADatatype> data) {
-        auto daiMsg = std::dynamic_pointer_cast<dai::ImgFrame>(data);
-        if (daiMsg) {
-            sensor_msgs::msg::Image msg;
-            msg.header.stamp = rclcpp::Time(std::chrono::duration_cast<std::chrono::nanoseconds>(daiMsg->getTimestamp().time_since_epoch()).count());
-            msg.header.frame_id = "oakd_camera";
-            msg.height = daiMsg->getHeight();
-            msg.width = daiMsg->getWidth();
-            msg.encoding = "nv12"; // Note: Ensure daiMsg data matches this format
-            msg.step = msg.width;
-            msg.data.assign(daiMsg->getData().begin(), daiMsg->getData().end());
-            raw_pub_->publish(std::move(msg));
-        }
-    });
+    // raw_q_->addCallback([this](std::shared_ptr<dai::ADatatype> data) {
+    //     auto daiMsg = std::dynamic_pointer_cast<dai::ImgFrame>(data);
+    //     if (daiMsg) {
+    //         sensor_msgs::msg::Image msg;
+    //         msg.header.stamp = rclcpp::Time(std::chrono::duration_cast<std::chrono::nanoseconds>(daiMsg->getTimestamp().time_since_epoch()).count());
+    //         msg.header.frame_id = "oakd_camera";
+    //         msg.height = daiMsg->getHeight();
+    //         msg.width = daiMsg->getWidth();
+    //         msg.encoding = "nv12"; // Note: Ensure daiMsg data matches this format
+    //         msg.step = msg.width;
+    //         msg.data.assign(daiMsg->getData().begin(), daiMsg->getData().end());
+    //         raw_pub_->publish(std::move(msg));
+    //     }
+    // });
 }
 
 void MobileNetPublisherNode::setupTelemetryPublishers() {
@@ -227,11 +233,16 @@ void MobileNetPublisherNode::setupTelemetryPublishers() {
     imu_q_->addCallback([this](std::shared_ptr<dai::ADatatype> data) {
         auto daiMsg = std::dynamic_pointer_cast<dai::IMUData>(data);
         if (daiMsg) {
-            std::deque<sensor_msgs::msg::Imu> rosMsgs;
-            
+
+            if (imu_warmup_count_ < MAX_WARMUP_COUNT) {
+                imu_warmup_count_++;
+                return; // Skip
+            }
+
+            std::deque<sensor_msgs::msg::Imu> rosMsgs;            
             // Let the bridge do the complex synchronization and math
             imu_conv_->toRosMsg(daiMsg, rosMsgs);
-            
+
             // Publish the resulting valid ROS messages
             for (auto& msg : rosMsgs) {
                 imu_pub_->publish(std::move(msg));
@@ -243,8 +254,13 @@ void MobileNetPublisherNode::setupTelemetryPublishers() {
     depth_q_->addCallback([this](std::shared_ptr<dai::ADatatype> data) {
         auto daiMsg = std::dynamic_pointer_cast<dai::ImgFrame>(data);
         if (daiMsg) {
+
+            if (depth_warmup_count_ < MAX_WARMUP_COUNT) {
+                depth_warmup_count_++;
+                return; // Skip
+            }
+
             std::deque<sensor_msgs::msg::Image> rosMsgs;
-            
             // Convert to ROS Image message
             depth_conv_->toRosMsg(daiMsg, rosMsgs);
             
