@@ -54,7 +54,7 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
         stereo_msgs
         std_msgs
         vision_msgs
-        # foxglove_compressed_video_transport
+        foxglove_compressed_video_transport
         )
 
 find_package(ament_cmake REQUIRED)
