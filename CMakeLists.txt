@@ -46,9 +46,9 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
         rclcpp_lifecycle
         camera_info_manager
         cv_bridge
-        depthai
-        depthai_ros_msgs
-        depthai_bridge
+        depthai_v3
+        depthai_ros_msgs_v3
+        depthai_bridge_v3
         foxglove_msgs
         sensor_msgs
         stereo_msgs
@@ -86,7 +86,7 @@ macro(dai_add_node_ros2 node_name node_src)
   add_executable("${node_name}" "${node_src}")
 
   target_link_libraries("${node_name}"
-          depthai::core
+          depthai_v3::core
           opencv_imgproc
           opencv_highgui)
 
