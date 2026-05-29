@@ -53,23 +53,40 @@ def generate_launch_description():
     Nodes
     """
     # Image transport republish node for decoding
+    # foxglove_decoder_node = Node(
+    #     name='image_foxglove_to_raw',
+    #     namespace=namespace,
+    #     package='image_transport',
+    #     executable='republish',
+    #     remappings=[
+    #         # 1. Map the exact plugin string directly to your input argument
+    #         ('in/foxglove', in_foxglove),
+    #         ('out', out_raw),
+    #     ],
+    #     arguments=['foxglove', 'raw'],
+    #     parameters=[{
+    #         # 2. Because it is now successfully remapped, the QoS override MUST 
+    #         # target the final resolved topic name (encoded_video)
+    #         'qos_overrides./rover/poe/encoded_video.subscription.reliability': 'best_effort',
+    #         'qos_overrides./rover/poe/encoded_video.subscription.durability': 'volatile',
+    #         'qos_overrides./rover/poe/encoded_video.subscription.history': 'keep_last',
+    #         'qos_overrides./rover/poe/encoded_video.subscription.depth': 1,
+    #     }]
+    # )
+
+    # Custom image transport republish node for decoding
     foxglove_decoder_node = Node(
         name='image_foxglove_to_raw',
         namespace=namespace,
-        package='image_transport',
-        executable='republish',
+        package='umrt-ros-poe-cam',
+        executable='foxglove_republisher_node',
         remappings=[
-            ('in', in_foxglove),
+            # We still need this exact mapping because image_transport appends 
+            # '/foxglove' to our base 'in' topic from the C++ code.
+            ('in/foxglove', in_foxglove), 
             ('out', out_raw),
-        ],
-        arguments=['foxglove', 'raw'],
-        parameters=[{
-            # Fully qualified path targeting the plugin subscription
-            'qos_overrides./rover/poe/encoded_video/foxglove.subscription.reliability': 'best_effort',
-            'qos_overrides./rover/poe/encoded_video/foxglove.subscription.durability': 'volatile',
-            'qos_overrides./rover/poe/encoded_video/foxglove.subscription.history': 'keep_last',
-            'qos_overrides./rover/poe/encoded_video/foxglove.subscription.depth': 1,
-        }]
+        ]
+        # Notice: No QoS overrides or arguments needed here anymore!
     )
 
     """

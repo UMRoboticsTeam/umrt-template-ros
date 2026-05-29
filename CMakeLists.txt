@@ -79,6 +79,12 @@ configure_file(
 )
 
 
+# --- Foxglove Republisher Node 
+add_executable(foxglove_republisher_node src/foxglove_republisher.cpp)
+
+ament_target_dependencies(foxglove_republisher_node rclcpp image_transport sensor_msgs)
+
+
 # For Nodes
 
 # Macro to add nodes
@@ -109,6 +115,7 @@ install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch
 # Install targets
 install(TARGETS
         mobilenet_node
+        foxglove_republisher_node
         DESTINATION lib/${PROJECT_NAME})
 
 ament_package()
