@@ -55,17 +55,95 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
         std_msgs
         vision_msgs
         foxglove_compressed_video_transport
-        )
+        image_transport
+)
 
 find_package(ament_cmake REQUIRED)
 foreach(Dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
         find_package(${Dependency} REQUIRED)
 endforeach()
 
-include_directories(
-        include
-        ${ament_INCLUDE_DIRS}
+# include_directories(
+#         include
+#         ${ament_INCLUDE_DIRS}
+# )
+# target_include_directories(${PROJECT_NAME} PUBLIC
+#         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+#         $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
+#         )
+
+# ==============================================================================
+# TARGET 1: Foxglove Republisher Node
+# ==============================================================================
+add_executable(republisher_node 
+        src/foxglove_republisher_node.cpp 
+        src/foxglove_republisher.cpp
 )
+
+target_compile_features(republisher_node PUBLIC cxx_std_17)
+
+target_include_directories(republisher_node PUBLIC
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
+)
+
+ament_target_dependencies(
+        republisher_node PUBLIC
+        ${THIS_PACKAGE_INCLUDE_DEPENDS}
+)
+
+# ==============================================================================
+# TARGET 2: MobileNet Publisher Node
+# ==============================================================================
+
+# For Nodes
+
+# Macro to add nodes
+# macro(dai_add_node_ros2 node_name node_src)
+#   add_executable("${node_name}" "${node_src}")
+
+#   target_link_libraries("${node_name}"
+#           depthai_v3::core
+#           opencv_imgproc
+#           opencv_highgui)
+
+#   ament_target_dependencies("${node_name}"
+#           ${THIS_PACKAGE_INCLUDE_DEPENDS})
+
+# endmacro()
+
+# # Add MobileNet Publisher Node
+# dai_add_node_ros2(mobilenet_node src/mobilenet_publisher.cpp)
+
+add_executable(mobilenet_node
+        src/mobilenet_publisher.cpp
+        src/mobilenet_publisher_node.cpp
+)
+
+target_compile_features(mobilenet_node PUBLIC cxx_std_17)
+
+target_include_directories(mobilenet_node PUBLIC
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
+)
+
+target_compile_definitions(mobilenet_node PRIVATE 
+        BLOB_NAME="${mobilenet_blob_name}"
+)
+
+target_link_libraries(mobilenet_node PRIVATE
+        depthai_v3::core
+        opencv_imgproc
+        opencv_highgui
+)
+
+ament_target_dependencies(mobilenet_node PUBLIC
+        ${THIS_PACKAGE_INCLUDE_DEPENDS} 
+)
+
+# ==============================================================================
+# Install & Export
+# ==============================================================================
 
 # Parse version number from the file
 file(READ "version" version_input)
@@ -78,44 +156,21 @@ configure_file(
         @ONLY
 )
 
-
-# --- Foxglove Republisher Node 
-add_executable(foxglove_republisher_node src/foxglove_republisher.cpp)
-
-ament_target_dependencies(foxglove_republisher_node rclcpp image_transport sensor_msgs)
-
-
-# For Nodes
-
-# Macro to add nodes
-macro(dai_add_node_ros2 node_name node_src)
-  add_executable("${node_name}" "${node_src}")
-
-  target_link_libraries("${node_name}"
-          depthai_v3::core
-          opencv_imgproc
-          opencv_highgui)
-
-  ament_target_dependencies("${node_name}"
-          ${THIS_PACKAGE_INCLUDE_DEPENDS})
-
-endmacro()
-
-# Add MobileNet Publisher Node
-dai_add_node_ros2(mobilenet_node src/mobilenet_publisher.cpp)
-
-target_compile_definitions(mobilenet_node PRIVATE BLOB_NAME="${mobilenet_blob_name}")
-
 # Install parameters, resources, and launch files
-install(DIRECTORY params DESTINATION share/${PROJECT_NAME})
-install(DIRECTORY resources DESTINATION share/${PROJECT_NAME})
-install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch
-        FILES_MATCHING PATTERN "*.py")
+install(DIRECTORY 
+        params
+        resources
+        launch
+        DESTINATION share/${PROJECT_NAME}
+)
+# install(DIRECTORY resources DESTINATION share/${PROJECT_NAME})
+# install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch
+#         FILES_MATCHING PATTERN "*.py")
 
 # Install targets
 install(TARGETS
+        republisher_node
         mobilenet_node
-        foxglove_republisher_node
         DESTINATION lib/${PROJECT_NAME})
 
 ament_package()
