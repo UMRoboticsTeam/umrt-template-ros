@@ -13,12 +13,30 @@ class FoxgloveRepublisher : public rclcpp::Node
 {
 
 public:
+
+    /**
+     * Initializes a FoxgloveRepublisher.
+     */
     FoxgloveRepublisher();
 
 private:
+
+    /**
+     * Publishes the raw image message.
+     *
+     * @param msg raw image message 
+     */
     void imageCallback(const sensor_msgs::msg::Image::ConstSharedPtr& msg);
 
+    /**
+     * Image Transport Suscriber, which subscribes to get the image frames to decode and republish
+     */
     image_transport::Subscriber sub_;
+
+
+    /**
+     * Image Transport Suscriber,whcih publishes the intended image frames
+     */
     image_transport::Publisher pub_;
 };
 

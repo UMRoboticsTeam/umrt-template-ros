@@ -17,22 +17,21 @@
 
 
 MobileNetPublisherNode::MobileNetPublisherNode() : Node("mobilenet_publisher_node") {
-    // 1. Initialize core hardware connection
+    //  Initialize hardware connection
     device_ = std::make_shared<dai::Device>();
     pipeline_ = std::make_shared<dai::Pipeline>(device_);
 
-    // 2. Build the hardware graph via modular functions
+    //  Build the pipeline
     setupCameraPipeline(*pipeline_);
     setupImuPipeline(*pipeline_);
     setupDepthPipeline(*pipeline_);
-    // setupOdomPipeline(*pipeline_);
 
-    // 3. Fire up the physical device
+    //  Start the pipeline
     pipeline_->start();
 
     RCLCPP_INFO(this->get_logger(), "Pipeline running: %s", pipeline_->isRunning() ? "yes" : "no");
 
-    // 4. Bind the hardware queues to ROS 2 bridge publishers
+    //  Setup the ROS2 publishers
     setupVideoPublishers();
     setupTelemetryPublishers();
 
@@ -42,8 +41,7 @@ void MobileNetPublisherNode::setupCameraPipeline(dai::Pipeline& pipeline) {
     color_cam_ = pipeline.create<dai::node::Camera>()->build(dai::CameraBoardSocket::CAM_A);
     video_enc_ = pipeline.create<dai::node::VideoEncoder>();
 
-    // auto script_node = pipeline.create<dai::node::Script>();
-
+    //  VideoEncoder configurations
     video_enc_->setDefaultProfilePreset(30, dai::VideoEncoderProperties::Profile::H264_MAIN);
 
     //  For Encoder Stream
@@ -51,25 +49,25 @@ void MobileNetPublisherNode::setupCameraPipeline(dai::Pipeline& pipeline) {
     cam_out->link(video_enc_->input);
 
     encoded_q_ = video_enc_->out.createOutputQueue(30, false);
-    
-}
+}   //  setupCameraPipeline()
 
 void MobileNetPublisherNode::setupImuPipeline(dai::Pipeline& pipeline) {
     imu_node_ = pipeline.create<dai::node::IMU>();
+
+    //  IMU configurations
     imu_node_->enableIMUSensor({dai::IMUSensor::ACCELEROMETER_RAW, dai::IMUSensor::GYROSCOPE_RAW}, 200);
     imu_node_->setBatchReportThreshold(1);
     imu_node_->setMaxBatchReports(10);
     
     imu_q_ = imu_node_->out.createOutputQueue(8, false);
-
-}
+}   //  setupImuPipeline()
 
 void MobileNetPublisherNode::setupDepthPipeline(dai::Pipeline& pipeline) {
 
     stereo_depth_ = pipeline.create<dai::node::StereoDepth>();
 
+    //  Depth configurations
     stereo_depth_->setDefaultProfilePreset(dai::node::StereoDepth::PresetMode::ROBOTICS);
-
     // mono_left = pipeline.create<dai::node::Camera>()->build(dai::CameraBoardSocket::CAM_B);
     // mono_right = pipeline.create<dai::node::Camera>()->build(dai::CameraBoardSocket::CAM_C);
     // Throttle the VIO/Depth cameras to 15 FPS to guarantee bandwidth for the 200Hz IMU
@@ -83,27 +81,11 @@ void MobileNetPublisherNode::setupDepthPipeline(dai::Pipeline& pipeline) {
     right_out->link(stereo_depth_->right);
 
     depth_q_ = stereo_depth_->depth.createOutputQueue(2, false);
-
-}
-
-void MobileNetPublisherNode::setupOdomPipeline(dai::Pipeline& pipeline) {
- 
-    odom_ = pipeline.create<dai::node::BasaltVIO>();
-
-    odom_->setImuUpdateRate(200);
-
-    // mono_left->requestOutput({640, 400}, dai::ImgFrame::Type::RAW8, dai::ImgResizeMode::CROP, 30)->link(odom_->left);
-    // mono_right->requestOutput({640, 400}, dai::ImgFrame::Type::RAW8, dai::ImgResizeMode::CROP, 30)->link(odom_->right);
-    stereo_depth_->syncedLeft.link(odom_->left);
-    stereo_depth_->syncedRight.link(odom_->right);
-    imu_node_->out.link(odom_->imu); 
-
-    odom_q_ = odom_->transform.createOutputQueue(8, false);
-
-}
+}   //  setupDepthPipeline()
 
 void MobileNetPublisherNode::setupVideoPublishers() {
 
+    //  Best Effort QoS
     rclcpp::QoS best_effort_qos(10);
     best_effort_qos.best_effort();
     best_effort_qos.durability_volatile();
@@ -122,7 +104,7 @@ void MobileNetPublisherNode::setupVideoPublishers() {
         }
     });
 
-}
+}   //  setupVideoPublishers()
 
 void MobileNetPublisherNode::setupTelemetryPublishers() {
 
@@ -141,7 +123,7 @@ void MobileNetPublisherNode::setupTelemetryPublishers() {
     depth_info_msg_ = depth_conv_->calibrationToCameraInfo(calibData, dai::CameraBoardSocket::CAM_C, 640, 400);
     depth_info_msg_.header.frame_id = "oakd_camera";
 
-    //  IMU Callback - Pushes data through the converter
+    //  IMU Callback - Pushes data through the converter, and publishes to topic
     imu_q_->addCallback([this](std::shared_ptr<dai::ADatatype> data) {
         auto daiMsg = std::dynamic_pointer_cast<dai::IMUData>(data);
         if (daiMsg) {
@@ -162,7 +144,7 @@ void MobileNetPublisherNode::setupTelemetryPublishers() {
         }
     });
 
-    //  Depth Callback - Pushes data through the converter
+    //  Depth Callback - Pushes data through the converter, and publishes to topic 
     depth_q_->addCallback([this](std::shared_ptr<dai::ADatatype> data) {
         auto daiMsg = std::dynamic_pointer_cast<dai::ImgFrame>(data);
         if (daiMsg) {
@@ -186,4 +168,4 @@ void MobileNetPublisherNode::setupTelemetryPublishers() {
         }
     });
 
-}
+}   //  setupTelemetryPublishers()

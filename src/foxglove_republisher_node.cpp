@@ -10,20 +10,17 @@
 
 FoxgloveRepublisher::FoxgloveRepublisher() : Node("foxglove_republisher")
 {
-    // Configure the Best Effort QoS for the Subscriber
-    rmw_qos_profile_t sub_qos = rmw_qos_profile_sensor_data; // Enforces BEST_EFFORT
+    // Configure the Best Effort QoS for the Subscriber and Publisher
+    rmw_qos_profile_t sub_qos = rmw_qos_profile_sensor_data; 
     sub_qos.depth = 1;
-
-    // Configure the QoS for the raw output Publisher 
-    // We set this to best-effort too
     rmw_qos_profile_t pub_qos = rmw_qos_profile_sensor_data;
     pub_qos.depth = 1;
 
-    // Create the Subscription using the 'foxglove' transport
+    // Create the Subscription using the 'Foxglove' compressed video transport
     // image_transport will transparently decode the stream into a raw sensor_msgs::msg::Image
     sub_ = image_transport::create_subscription(
         this,
-        "in", // Base topic
+        "in", // Input Topic 
         std::bind(&FoxgloveRepublisher::imageCallback, this, std::placeholders::_1),
         "foxglove",
         sub_qos
@@ -32,7 +29,7 @@ FoxgloveRepublisher::FoxgloveRepublisher() : Node("foxglove_republisher")
     // Create the Publisher
     pub_ = image_transport::create_publisher(
         this,
-        "out", 
+        "out",  //  Output Topic
         pub_qos
     );
 
@@ -41,6 +38,6 @@ FoxgloveRepublisher::FoxgloveRepublisher() : Node("foxglove_republisher")
 
 void FoxgloveRepublisher::imageCallback(const sensor_msgs::msg::Image::ConstSharedPtr& msg)
 {
-    // Republish the freshly decoded raw image
+    // Republish the decoded raw image
     pub_.publish(msg);
 }

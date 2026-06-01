@@ -21,47 +21,149 @@ class MobileNetPublisherNode : public rclcpp::Node
 {
 
 public:
+
+    /**
+     * Initializes a MobileNetPublisherNode.
+     */
     MobileNetPublisherNode();
 
 private:
 
+    /**
+     * Setup the Camera pipeline, specifically the H.264 encoded frames,
+     * and configures the Camera
+     *
+     * @param pipeline the pipeline network the node belongs to
+     */
     void setupCameraPipeline(dai::Pipeline& pipeline);
-    void setupImuPipeline(dai::Pipeline& pipeline);
-    void setupDepthPipeline(dai::Pipeline& pipeline);
-    void setupOdomPipeline(dai::Pipeline& pipeline);
 
+    /**
+     * Setup the IMU pipeline, which also has configures the IMU
+     * 
+     * @param pipeline the pipeline network the node belongs to
+     */
+    void setupImuPipeline(dai::Pipeline& pipeline);
+
+    /**
+     * Setup the Depth pipeline, which also configures the stereo cameras and StereoDepth
+     *
+     * @param pipeline the pipeline network the node belongs to
+     */
+    void setupDepthPipeline(dai::Pipeline& pipeline);
+
+    /**
+     * Setup the Foxglove CompressedVideo ROS2 publisher
+     */
     void setupVideoPublishers();
+
+    /**
+     * Setup the Telemetry publisher, which includes both the IMU and Depth ROS2 publisher
+     */
     void setupTelemetryPublishers();
 
+    /**
+     * The DepthAI Device
+     */
     std::shared_ptr<dai::Device> device_;
+
+    /**
+     * The DepthAI vision pipeline
+     */
     std::shared_ptr<dai::Pipeline> pipeline_;
 
+    /**
+     * The RGB camera node, that interfaces with the device color camera in the pipeline
+     */
     std::shared_ptr<dai::node::Camera> color_cam_;
+
+    /**
+     * VideoEncoder node, that encodes the camera feed using H.264 
+     */
     std::shared_ptr<dai::node::VideoEncoder> video_enc_;
+
+    /**
+     * IMU node, which interfaces with the device IMU in the pipeline 
+     */
     std::shared_ptr<dai::node::IMU> imu_node_;
+
+    /**
+     * Left stereo camera node, that interfaces with the device left stereo camera
+     */
     std::shared_ptr<dai::node::Camera> mono_left;
+
+    /**
+     * Right stereo camera node, that interfaces with the device left stereo camera
+     */
     std::shared_ptr<dai::node::Camera> mono_right;
+
+    /**
+     * Stereo Depth node, calculates the depth of from a pair of stereo cameras
+     */
     std::shared_ptr<dai::node::StereoDepth> stereo_depth_;
-    std::shared_ptr<dai::node::BasaltVIO> odom_;
 
+    /**
+     * Encoded video message queue
+     */
     std::shared_ptr<dai::MessageQueue> encoded_q_;
-    std::shared_ptr<dai::MessageQueue> imu_q_;
-    std::shared_ptr<dai::MessageQueue> depth_q_;
-    std::shared_ptr<dai::MessageQueue> odom_q_;
 
+    /**
+     * IMU message queue
+     */
+    std::shared_ptr<dai::MessageQueue> imu_q_;
+
+    /**
+     * Depth message queue
+     */
+    std::shared_ptr<dai::MessageQueue> depth_q_;
+
+    /**
+     * Foxglove CompressedVideo ROS2 topic publisher
+     */
     rclcpp::Publisher<foxglove_msgs::msg::CompressedVideo>::SharedPtr encoded_pub_;
-    rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_; 
+
+    /**
+     * IMU message ROS2 topic publisher 
+     */
+    rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
+    
+    /**
+     * Depth message ROS2 topic publisher
+     */
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr depth_pub_;
+
+    /**
+     * Depth camera info message ROS2 topic publisher 
+     */
     rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr depth_info_pub_;
-    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
+
+    /**
+     * Camera ROS2 info 
+     */
     sensor_msgs::msg::CameraInfo depth_info_msg_;
 
+    /**
+     * DepthAI IMU data converter
+     */
     std::shared_ptr<depthai_bridge::ImuConverter> imu_conv_;
-    std::shared_ptr<depthai_bridge::ImageConverter> depth_conv_;
-    std::shared_ptr<depthai_bridge::TransformDataConverter> odom_conv_;
 
+    /**
+     * DepthAI Depth data converter
+     */
+    std::shared_ptr<depthai_bridge::ImageConverter> depth_conv_;
+
+    /**
+     * A counter to ensure that IMU publisher has gone through a certain amount of data before starting to publish
+     */
     int imu_warmup_count_ = 0;
+
+    /**
+     * A counter to ensure that Depth publisher has gone through a certain amount of data before starting to publish
+     */
     int depth_warmup_count_ = 0;
+
+    /**
+     * A minimum amount of values that both the IMU and Depth have to receive before starting to publish ROS2 data
+     */
     const int MAX_WARMUP_COUNT = 50;
 
 };
