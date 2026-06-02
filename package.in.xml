@@ -30,6 +30,7 @@
   <depend>stereo_msgs</depend>
   <depend>vision_msgs</depend>
   <depend>foxglove_msgs</depend>
+  <!-- <depend>foxglove_compressed_video_transport</depend> -->
 
   <!-- Execution dependencies -->
   <exec_depend>robot_state_publisher</exec_depend>

@@ -46,25 +46,80 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
         rclcpp_lifecycle
         camera_info_manager
         cv_bridge
-        depthai
-        depthai_ros_msgs
-        depthai_bridge
+        depthai_v3
+        depthai_ros_msgs_v3
+        depthai_bridge_v3
         foxglove_msgs
         sensor_msgs
         stereo_msgs
         std_msgs
         vision_msgs
-        )
+        foxglove_compressed_video_transport
+        image_transport
+)
 
 find_package(ament_cmake REQUIRED)
 foreach(Dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
         find_package(${Dependency} REQUIRED)
 endforeach()
 
-include_directories(
-        include
-        ${ament_INCLUDE_DIRS}
+# ==============================================================================
+# TARGET 1: Foxglove Republisher Node
+# ==============================================================================
+
+set(republisher_node_target republisher_node)
+
+add_executable(${republisher_node_target}
+        src/foxglove_republisher_node.cpp 
+        src/foxglove_republisher.cpp
 )
+
+target_compile_features(${republisher_node_target} PUBLIC cxx_std_17)
+
+target_include_directories(${republisher_node_target} PUBLIC
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
+)
+
+ament_target_dependencies(${republisher_node_target} PUBLIC
+        ${THIS_PACKAGE_INCLUDE_DEPENDS}
+)
+
+# ==============================================================================
+# TARGET 2: MobileNet Publisher Node
+# ==============================================================================
+
+set(mobilenet_node_target mobilenet_node)
+
+add_executable(${mobilenet_node_target}
+        src/mobilenet_publisher.cpp
+        src/mobilenet_publisher_node.cpp
+)
+
+target_compile_features(${mobilenet_node_target} PUBLIC cxx_std_17)
+
+target_include_directories(${mobilenet_node_target} PUBLIC
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
+)
+
+target_compile_definitions(${mobilenet_node_target} PRIVATE 
+        BLOB_NAME="${mobilenet_blob_name}"
+)
+
+target_link_libraries(${mobilenet_node_target} PRIVATE
+        depthai_v3::core
+        opencv_imgproc
+        opencv_highgui
+)
+
+ament_target_dependencies(${mobilenet_node_target} PUBLIC
+        ${THIS_PACKAGE_INCLUDE_DEPENDS} 
+)
+
+# ==============================================================================
+# Install & Export
+# ==============================================================================
 
 # Parse version number from the file
 file(READ "version" version_input)
@@ -77,36 +132,17 @@ configure_file(
         @ONLY
 )
 
-
-# For Nodes
-
-# Macro to add nodes
-macro(dai_add_node_ros2 node_name node_src)
-  add_executable("${node_name}" "${node_src}")
-
-  target_link_libraries("${node_name}"
-          depthai::core
-          opencv_imgproc
-          opencv_highgui)
-
-  ament_target_dependencies("${node_name}"
-          ${THIS_PACKAGE_INCLUDE_DEPENDS})
-
-endmacro()
-
-# Add MobileNet Publisher Node
-dai_add_node_ros2(mobilenet_node src/mobilenet_publisher.cpp)
-
-target_compile_definitions(mobilenet_node PRIVATE BLOB_NAME="${mobilenet_blob_name}")
-
 # Install parameters, resources, and launch files
-install(DIRECTORY params DESTINATION share/${PROJECT_NAME})
-install(DIRECTORY resources DESTINATION share/${PROJECT_NAME})
-install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch
-        FILES_MATCHING PATTERN "*.py")
+install(DIRECTORY 
+        params
+        resources
+        launch
+        DESTINATION share/${PROJECT_NAME}
+)
 
 # Install targets
 install(TARGETS
+        republisher_node
         mobilenet_node
         DESTINATION lib/${PROJECT_NAME})
 
