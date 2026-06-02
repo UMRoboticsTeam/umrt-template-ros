@@ -1,6 +1,12 @@
-//
-// Created by ea on 2026-29-05.
-//
+/*
+ * Copyright 2024 Edcel Abanto, University of Manitoba Robotics Team
+ * 
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * 
+ * Created on 2026-29-05 by ea.
+ */
 
 #include <cstdio>
 #include <iostream>
@@ -17,52 +23,67 @@
 
 
 MobileNetPublisherNode::MobileNetPublisherNode() : Node("mobilenet_publisher_node") {
+
+    //  Initialize the counters
+    imu_warmup_count_=0;
+    depth_warmup_count_=0;
+
     //  Initialize hardware connection
     device_ = std::make_shared<dai::Device>();
     pipeline_ = std::make_shared<dai::Pipeline>(device_);
 
     //  Build the pipeline
-    setupCameraPipeline(*pipeline_);
-    setupImuPipeline(*pipeline_);
-    setupDepthPipeline(*pipeline_);
+    SetupCameraPipeline(*pipeline_);
+    SetupImuPipeline(*pipeline_);
+    SetupDepthPipeline(*pipeline_);
 
     //  Start the pipeline
     pipeline_->start();
 
     RCLCPP_INFO(this->get_logger(), "Pipeline running: %s", pipeline_->isRunning() ? "yes" : "no");
 
+    if (!pipeline_->isRunning()) {
+        RCLCPP_ERROR(this->get_logger(), "umrt-ros-poe-cam: DepthAI Pipeline failed to start or stopped unexpectedly! Shutting down node...");
+        rclcpp::shutdown();
+        return; 
+    }
+
+    RCLCPP_INFO(this->get_logger(), "Pipeline running successfully.");
+
     //  Setup the ROS2 publishers
-    setupVideoPublishers();
-    setupTelemetryPublishers();
+    SetupVideoPublishers();
+    SetupTelemetryPublishers();
 
 }
 
-void MobileNetPublisherNode::setupCameraPipeline(dai::Pipeline& pipeline) {
+void MobileNetPublisherNode::SetupCameraPipeline(dai::Pipeline& pipeline) {
     color_cam_ = pipeline.create<dai::node::Camera>()->build(dai::CameraBoardSocket::CAM_A);
     video_enc_ = pipeline.create<dai::node::VideoEncoder>();
 
     //  VideoEncoder configurations
-    video_enc_->setDefaultProfilePreset(30, dai::VideoEncoderProperties::Profile::H264_MAIN);
+    video_enc_->setDefaultProfilePreset(CAMERA_FPS, dai::VideoEncoderProperties::Profile::H264_MAIN);
 
     //  For Encoder Stream
-    auto cam_out = color_cam_->requestOutput({1920, 1080}, dai::ImgFrame::Type::NV12, dai::ImgResizeMode::CROP, 30);
+    auto cam_out = color_cam_->requestOutput({1920, 1080}, dai::ImgFrame::Type::NV12, dai::ImgResizeMode::CROP, CAMERA_FPS);
     cam_out->link(video_enc_->input);
 
+    //  The 30 here indicates the max size of the output queue
     encoded_q_ = video_enc_->out.createOutputQueue(30, false);
-}   //  setupCameraPipeline()
+}   //  SetupCameraPipeline()
 
-void MobileNetPublisherNode::setupImuPipeline(dai::Pipeline& pipeline) {
+void MobileNetPublisherNode::SetupImuPipeline(dai::Pipeline& pipeline) {
     imu_node_ = pipeline.create<dai::node::IMU>();
 
     //  IMU configurations
-    imu_node_->enableIMUSensor({dai::IMUSensor::ACCELEROMETER_RAW, dai::IMUSensor::GYROSCOPE_RAW}, 200);
+    imu_node_->enableIMUSensor({dai::IMUSensor::ACCELEROMETER_RAW, dai::IMUSensor::GYROSCOPE_RAW},  IMU_REPORT_RATE_Hz);
     imu_node_->setBatchReportThreshold(1);
     imu_node_->setMaxBatchReports(10);
     
+    //  The 8 here indicates the max size of the output queue
     imu_q_ = imu_node_->out.createOutputQueue(8, false);
-}   //  setupImuPipeline()
+}   //  SetupImuPipeline()
 
-void MobileNetPublisherNode::setupDepthPipeline(dai::Pipeline& pipeline) {
+void MobileNetPublisherNode::SetupDepthPipeline(dai::Pipeline& pipeline) {
 
     stereo_depth_ = pipeline.create<dai::node::StereoDepth>();
 
@@ -71,19 +92,20 @@ void MobileNetPublisherNode::setupDepthPipeline(dai::Pipeline& pipeline) {
     // mono_left = pipeline.create<dai::node::Camera>()->build(dai::CameraBoardSocket::CAM_B);
     // mono_right = pipeline.create<dai::node::Camera>()->build(dai::CameraBoardSocket::CAM_C);
     // Throttle the VIO/Depth cameras to 15 FPS to guarantee bandwidth for the 200Hz IMU
-    mono_left = pipeline.create<dai::node::Camera>()->build(dai::CameraBoardSocket::CAM_B, std::nullopt, 15);
-    mono_right = pipeline.create<dai::node::Camera>()->build(dai::CameraBoardSocket::CAM_C, std::nullopt, 15);
+    mono_left_ = pipeline.create<dai::node::Camera>()->build(dai::CameraBoardSocket::CAM_B, std::nullopt, DEPTH_FPS);
+    mono_right_ = pipeline.create<dai::node::Camera>()->build(dai::CameraBoardSocket::CAM_C, std::nullopt, DEPTH_FPS);
 
-    auto left_out = mono_left->requestOutput({640, 400}, dai::ImgFrame::Type::RAW8, dai::ImgResizeMode::CROP, 15);
-    auto right_out = mono_right->requestOutput({640, 400}, dai::ImgFrame::Type::RAW8, dai::ImgResizeMode::CROP, 15);
+    auto left_out = mono_left_->requestOutput({640, 400}, dai::ImgFrame::Type::RAW8, dai::ImgResizeMode::CROP, DEPTH_FPS);
+    auto right_out = mono_right_->requestOutput({640, 400}, dai::ImgFrame::Type::RAW8, dai::ImgResizeMode::CROP, DEPTH_FPS);
 
     left_out->link(stereo_depth_->left);
     right_out->link(stereo_depth_->right);
 
+    //  The 2 here indicates the max size of the output queue
     depth_q_ = stereo_depth_->depth.createOutputQueue(2, false);
-}   //  setupDepthPipeline()
+}   //  SetupDepthPipeline()
 
-void MobileNetPublisherNode::setupVideoPublishers() {
+void MobileNetPublisherNode::SetupVideoPublishers() {
 
     //  Best Effort QoS
     rclcpp::QoS best_effort_qos(10);
@@ -104,9 +126,9 @@ void MobileNetPublisherNode::setupVideoPublishers() {
         }
     });
 
-}   //  setupVideoPublishers()
+}   //  SetupVideoPublishers()
 
-void MobileNetPublisherNode::setupTelemetryPublishers() {
+void MobileNetPublisherNode::SetupTelemetryPublishers() {
 
     //  Initialize Publishers
     imu_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu/data", 30);
@@ -168,4 +190,4 @@ void MobileNetPublisherNode::setupTelemetryPublishers() {
         }
     });
 
-}   //  setupTelemetryPublishers()
+}   //  SetupTelemetryPublishers()

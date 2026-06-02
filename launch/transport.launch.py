@@ -36,14 +36,6 @@ def generate_launch_description():
         description = 'Output raw image topic.'
     )
 
-    # didnt really apply this
-    # qos_profile = QoSProfile(
-    #     reliability=ReliabilityPolicy.BEST_EFFORT, # Matches your C++ publisher
-    #     history=HistoryPolicy.KEEP_LAST,
-    #     depth=1, # Depth 1 as per your C++ publisher
-    #     durability=DurabilityPolicy.VOLATILE # Matches your C++ publisher
-    # )
-
     # Launch configurations
     namespace = LaunchConfiguration('namespace')
     in_foxglove = LaunchConfiguration('in_foxglove')
@@ -52,27 +44,6 @@ def generate_launch_description():
     """
     Nodes
     """
-    # Image transport republish node for decoding
-    # foxglove_decoder_node = Node(
-    #     name='image_foxglove_to_raw',
-    #     namespace=namespace,
-    #     package='image_transport',
-    #     executable='republish',
-    #     remappings=[
-    #         # 1. Map the exact plugin string directly to your input argument
-    #         ('in/foxglove', in_foxglove),
-    #         ('out', out_raw),
-    #     ],
-    #     arguments=['foxglove', 'raw'],
-    #     parameters=[{
-    #         # 2. Because it is now successfully remapped, the QoS override MUST 
-    #         # target the final resolved topic name (encoded_video)
-    #         'qos_overrides./rover/poe/encoded_video.subscription.reliability': 'best_effort',
-    #         'qos_overrides./rover/poe/encoded_video.subscription.durability': 'volatile',
-    #         'qos_overrides./rover/poe/encoded_video.subscription.history': 'keep_last',
-    #         'qos_overrides./rover/poe/encoded_video.subscription.depth': 1,
-    #     }]
-    # )
 
     # Custom image transport republish node for decoding
     foxglove_decoder_node = Node(
@@ -86,19 +57,16 @@ def generate_launch_description():
             ('in/foxglove', in_foxglove), 
             ('out', out_raw),
         ]
-        # Notice: No QoS overrides or arguments needed here anymore!
     )
 
     """
     Launch
     """
-    decode = [
+    launch_entities = [
         namespace_arg,
         in_foxglove_arg,
         out_raw_arg,
         foxglove_decoder_node
     ]
-
-    launch_entities = decode 
 
     return LaunchDescription(launch_entities)

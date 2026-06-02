@@ -28,6 +28,11 @@ Separating mobule_publisher.cpp to different cpp and hpp files
 ---
 # UMRT ROS PoE Camera
 
+Informal Info:
+
+mobile_publisher.launch.py - Launches the mobilenet_publisher ROS2 node, which is responsible for initializing the Oak D PoE camera, as well as launch configurations and the URDF models.
+transport.launch.py - Launches a image_transport republisher, which subscribes to a best effort QoS Foxglove CompressedVideo topic message and outputs a Raw Image topic message.
+
 This library/executable/project implements PoE Camera functionality for the University of Manitoba Robotics Team's 
 rover/robotic arm.
 

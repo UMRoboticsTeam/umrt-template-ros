@@ -1,9 +1,15 @@
-//
-// Created by ea on 2026-29-05.
-//
+/*
+ * Copyright 2024 Edcel Abanto, University of Manitoba Robotics Team
+ * 
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * 
+ * Created on 2026-29-05 by ea.
+ */
 
-#ifndef UMRT_MOBILENET_PUBLISHER_HPP
-#define UMRT_MOBILENET_PUBLISHER_HPP
+#ifndef UMRT_ROS_POE_CAM__MOBILENET_PUBLISHER_HPP
+#define UMRT_ROS_POE_CAM__MOBILENET_PUBLISHER_HPP
 
 #include <cstdio>
 #include <iostream>
@@ -17,6 +23,14 @@
 #include "depthai_bridge/ImageConverter.hpp"
 #include "depthai_bridge/TransformDataConverter.hpp"
 
+/**
+ * @class MobileNetPublisherNode
+ * @brief Manages a Luxonis OAK-D PoE camera pipeline.
+ *
+ * @details This node interfaces with the DepthAI-V3 API to construct and run a hardware-accelerated 
+ * encoded video stream, stereo depth, and IMU pipeline on an OAK-D PoE camera.
+ *
+ */
 class MobileNetPublisherNode : public rclcpp::Node
 {
 
@@ -30,36 +44,56 @@ public:
 private:
 
     /**
+     * A minimum amount of values that both the IMU and Depth have to receive before starting to publish ROS2 data
+     */
+    static constexpr int MAX_WARMUP_COUNT = 50;
+
+    /**
+     * The report rate the IMU will output, meaning it will output every 5 milliseconds. 
+     */
+    static constexpr int IMU_REPORT_RATE_Hz = 200; 
+
+    /**
+     * The Color Camera FPS output 
+     */
+    static constexpr int CAMERA_FPS = 30;
+
+    /**
+     * The Depth Camera FPS output 
+     */
+    static constexpr int DEPTH_FPS = 15;
+
+    /**
      * Setup the Camera pipeline, specifically the H.264 encoded frames,
      * and configures the Camera
      *
      * @param pipeline the pipeline network the node belongs to
      */
-    void setupCameraPipeline(dai::Pipeline& pipeline);
+    void SetupCameraPipeline(dai::Pipeline& pipeline);
 
     /**
      * Setup the IMU pipeline, which also has configures the IMU
      * 
      * @param pipeline the pipeline network the node belongs to
      */
-    void setupImuPipeline(dai::Pipeline& pipeline);
+    void SetupImuPipeline(dai::Pipeline& pipeline);
 
     /**
      * Setup the Depth pipeline, which also configures the stereo cameras and StereoDepth
      *
      * @param pipeline the pipeline network the node belongs to
      */
-    void setupDepthPipeline(dai::Pipeline& pipeline);
+    void SetupDepthPipeline(dai::Pipeline& pipeline);
 
     /**
      * Setup the Foxglove CompressedVideo ROS2 publisher
      */
-    void setupVideoPublishers();
+    void SetupVideoPublishers();
 
     /**
      * Setup the Telemetry publisher, which includes both the IMU and Depth ROS2 publisher
      */
-    void setupTelemetryPublishers();
+    void SetupTelemetryPublishers();
 
     /**
      * The DepthAI Device
@@ -89,12 +123,12 @@ private:
     /**
      * Left stereo camera node, that interfaces with the device left stereo camera
      */
-    std::shared_ptr<dai::node::Camera> mono_left;
+    std::shared_ptr<dai::node::Camera> mono_left_;
 
     /**
      * Right stereo camera node, that interfaces with the device left stereo camera
      */
-    std::shared_ptr<dai::node::Camera> mono_right;
+    std::shared_ptr<dai::node::Camera> mono_right_;
 
     /**
      * Stereo Depth node, calculates the depth of from a pair of stereo cameras
@@ -137,7 +171,7 @@ private:
     rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr depth_info_pub_;
 
     /**
-     * Camera ROS2 info 
+     * ROS2 Camera calibration parameters for the depth sensor, and depth image rectification.
      */
     sensor_msgs::msg::CameraInfo depth_info_msg_;
 
@@ -154,18 +188,13 @@ private:
     /**
      * A counter to ensure that IMU publisher has gone through a certain amount of data before starting to publish
      */
-    int imu_warmup_count_ = 0;
+    int imu_warmup_count_;
 
     /**
      * A counter to ensure that Depth publisher has gone through a certain amount of data before starting to publish
      */
-    int depth_warmup_count_ = 0;
-
-    /**
-     * A minimum amount of values that both the IMU and Depth have to receive before starting to publish ROS2 data
-     */
-    const int MAX_WARMUP_COUNT = 50;
+    int depth_warmup_count_;
 
 };
 
-#endif
+#endif //UMRT_ROS_POE_CAM__MOBILENET_PUBLISHER
