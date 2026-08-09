@@ -63,6 +63,15 @@ void MobileNetPublisherNode::SetupCameraPipeline(dai::Pipeline& pipeline) {
     //  VideoEncoder configurations
     video_enc_->setDefaultProfilePreset(CAMERA_FPS, dai::VideoEncoderProperties::Profile::H264_MAIN);
 
+    //  Set I-frame interval (GOP size) to match your FPS
+    //  This forces a full frame every 1 second, resetting the stream instantly if a P-frame drops.
+    video_enc_->setKeyframeFrequency(CAMERA_FPS); 
+
+    //  RECOMMENDED: Enforce Constant Bitrate (CBR)
+    //  Prevents motion-heavy scenes from spiking the bandwidth and dropping packets.
+    video_enc_->setRateControlMode(dai::VideoEncoderProperties::RateControlMode::CBR);
+    video_enc_->setBitrateKbps(4000); // 4000 Kbps (4 Mbps) is a stable baseline for 1080p
+
     //  For Encoder Stream
     auto cam_out = color_cam_->requestOutput({1920, 1080}, dai::ImgFrame::Type::NV12, dai::ImgResizeMode::CROP, CAMERA_FPS);
     cam_out->link(video_enc_->input);
